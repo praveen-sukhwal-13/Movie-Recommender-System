@@ -2,74 +2,94 @@ import streamlit as st
 import pickle
 import requests
 
-movies = pickle.load(open("movies_list.pkl", "rb")) # movies_list ko read mode me open kra
-similarity = pickle.load(open("similarity.pkl", "rb"))
-movies_list = movies['title'].values # title liya apn ne number ki jgha movie ka
-st.header("Movie Recommender System")
+st.set_page_config(page_title="Moreso", page_icon="🎬", layout="wide")
+
+
+# Cache the loading files to improve performance
+@st.cache_data
+def load_movies_data():
+    return pickle.load(open("movies_list.pkl", 'rb'))
+
+
+@st.cache_data
+def load_similarity_data():
+    return pickle.load(open("similarity.pkl", 'rb'))
+
+
+movies = load_movies_data()
+similarity = load_similarity_data()
+movies_list = movies['title'].values
+
+# Custom header styling
+st.markdown(
+    """
+    <style>
+        .header {
+            font-size: 3rem;
+            color: #1abc9c; /* Custom color for the header */
+            font-weight: bold;
+            text-align: center; /* Center-align the header */
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Display the header with the new style
+st.markdown('<div class="header">Moreso</div>', unsafe_allow_html=True)
+
+# Dropdown to select a movie
+select_value = st.selectbox("Select movie from dropdown", movies_list)
+
+
+@st.cache_data  # Used caching for improving performance
 def fetch_poster(movie_id):
-    url = "https://api.themoviedb.org/3/movie/{}?api_key=c7ec19ffdd3279641fb606d19ceb9bb1&language=en-US".format(movie_id)
+    api_key = "873c728f"
+    url = f"http://www.omdbapi.com/?i={movie_id}&apikey={api_key}"
     data = requests.get(url)
-    data = data.json() # converted into json file
-    poster_path = data['poster_path']
-    full_path = "https://image.tmdb.org/t/p/w500"+poster_path
-    return full_path
-import streamlit.components.v1 as components
-imageCarouselComponent = components.declare_component("image-carousel-component", path = 'frontend/public')
-imageUrls = [
-    fetch_poster(1632),
-    fetch_poster(299536),
-    fetch_poster(17455),
-    fetch_poster(2830),
-    fetch_poster(429422),
-    fetch_poster(9722),
-    fetch_poster(13972),
-    fetch_poster(240),
-    fetch_poster(155),
-    fetch_poster(598),
-    fetch_poster(914),
-    fetch_poster(255709),
-    fetch_poster(572154)
+    data = data.json()
 
-]
-imageCarouselComponent(imageUrls = imageUrls, height = 200)
-selectvalue = st.selectbox("Select movie from the dropdown", movies_list)
-def fetch_poster(movie_id):
-    url = "https://api.themoviedb.org/3/movie/{}?api_key=c7ec19ffdd3279641fb606d19ceb9bb1&language=en-US".format(movie_id)
-    data = requests.get(url)
-    data = data.json() # converted into json file
-    poster_path = data['poster_path']
-    full_path = "https://image.tmdb.org/t/p/w500"+poster_path
-    return full_path
+    poster_path = data.get("Poster")
+    if poster_path and poster_path != "N/A":
+        return poster_path
+    else:
+        return "https://via.placeholder.com/500x750?text=No+Image+Available"
 
 
+@st.cache_data
 def recommend(movie):
     index = movies[movies['title'] == movie].index[0]
-    distance = sorted(list(enumerate(similarity[index])), reverse = True, key = lambda vector:vector[1]) # har movies ke index ke bich ki similarity
+    distance = sorted(list(enumerate(similarity[index])), reverse=True, key=lambda vector: vector[1])
     recommend_movie = []
-    recommend_poster= []
+    recommend_poster = []
     for i in distance[1:6]:
-        movies_id = movies.iloc[i[0]].id # i ke 0 index p hai uski id de do
-        recommend_movie.append(movies.iloc[i[0]].title) # 5 similar movies # gives the title of the index number # 0 isliye q ki index 0 p hai
+        movies_id = movies.iloc[i[0]].id
+        recommend_movie.append(movies.iloc[i[0]].title)
         recommend_poster.append(fetch_poster(movies_id))
     return recommend_movie, recommend_poster
 
 
-
+# Show recommendations when the button is clicked
 if st.button("Show Recommend"):
-    movie_name, movie_poster = recommend(selectvalue)
+    movie_name, movie_poster = recommend(select_value)
     col1, col2, col3, col4, col5 = st.columns(5)
+
     with col1:
         st.text(movie_name[0])
         st.image(movie_poster[0])
+
     with col2:
         st.text(movie_name[1])
         st.image(movie_poster[1])
+
     with col3:
         st.text(movie_name[2])
         st.image(movie_poster[2])
+
     with col4:
         st.text(movie_name[3])
         st.image(movie_poster[3])
+
     with col5:
         st.text(movie_name[4])
         st.image(movie_poster[4])
